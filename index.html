@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1f6f6b">
+<title>Yoshida Virtual Care Academy</title>
+<link rel="manifest" id="mf">
+<style>
+:root{--bg:#f4f8f7;--card:#fff;--tx:#1d2b2a;--pr:#1f6f6b;--ac:#f2a93b;--mu:#6b7d7b;--bd:#d9e5e3;--ok:#2e8b57;--ng:#c0392b}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.6 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--tx);padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+header{background:var(--pr);color:#fff;padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
+header b{font-size:17px}header small{display:block;opacity:.85}
+main{max-width:640px;margin:0 auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;align-items:center;width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.lock{opacity:.5}.mu{color:var(--mu);font-size:14px}
+button{font:inherit;cursor:pointer}
+button.pri{background:var(--pr);color:#fff;border:0;border-radius:10px;padding:10px 16px;margin:4px 6px 4px 0}
+button.sm,button.link{background:none;border:1px solid var(--bd);border-radius:8px;padding:2px 10px;margin:4px 6px 0 0;color:var(--pr)}
+button.link{border:0;padding:6px 0}
+button:disabled{opacity:.5;cursor:default}
+.word{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed var(--bd)}
+.script{background:#eef6f5;border-radius:8px;padding:10px}
+.opt{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px;margin:8px 0;color:var(--tx)}
+.good{background:#dff3e7;border-color:var(--ok)}.bad{background:#fbe3df;border-color:var(--ng)}
+#chat{max-height:52vh;overflow-y:auto;padding:4px}
+.msg{padding:10px 12px;border-radius:14px;margin:8px 0;max-width:88%;white-space:pre-wrap}
+.msg.me{background:var(--pr);color:#fff;margin-left:auto}
+.msg.ai{background:var(--card);border:1px solid var(--bd)}
+.tag{margin-top:6px;font-size:13px;color:var(--ng)}
+form{display:flex;gap:8px;margin-top:8px}
+input[type=text],input[type=password]{flex:1;font:inherit;padding:10px;border:1px solid var(--bd);border-radius:10px;min-width:0}
+.mic{width:84px;height:84px;border-radius:50%;border:0;background:var(--ac);font-size:34px;display:block;margin:10px auto}
+.mic.rec{background:var(--ng);animation:p 1s infinite}
+@keyframes p{50%{transform:scale(1.08)}}
+.res{padding:12px;border-radius:10px;margin-top:10px}
+.res.pass{background:#dff3e7}.res.close{background:#fff1d6}.res.retry{background:#fbe3df}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:8px 0;font-size:12px;color:var(--mu)}
+nav button span{display:block;font-size:22px}
+nav button.on{color:var(--pr);font-weight:700}
+details{margin-top:12px}summary{cursor:pointer;color:var(--mu)}
+a.dc{display:inline-block;background:#5865f2;color:#fff;text-decoration:none;border-radius:10px;padding:10px 16px}
+.big{font-size:32px;font-weight:700;color:var(--pr)}
+</style>
+</head>
+<body>
+<header><b>🏫 Yoshida Virtual Care Academy</b><small>24時間眠らない、介護人材のためのオンライン専門校</small></header>
+<main>
+<section id="v-lec"></section>
+<section id="v-off" hidden></section>
+<section id="v-lab" hidden></section>
+<section id="v-lng" hidden></section>
+</main>
+<nav id="nav"></nav>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+function h(t,a={},...c){const e=document.createElement(t);for(const k in a){const v=a[k];if(v==null||v===false)continue;if(k==='class')e.className=v;else if(k.startsWith('on'))e[k]=v;else e.setAttribute(k,v)}c.flat().forEach(x=>{if(x!=null&&x!==false)e.append(x)});return e}
+const store={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v==null?d:v}catch(e){return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+let st=Object.assign({name:'Maria',ch:1,badges:[],minutes:0,alerts:[],key:'',labPass:0,logs:[],days:[]},store.get('yvca',{}));
+const save=()=>store.set('yvca',st);
+const log=o=>{st.logs.push(Object.assign({at:new Date().toISOString()},o));if(st.logs.length>2000)st.logs.splice(0,st.logs.length-2000);save()};
+{const d=new Date().toLocaleDateString('sv');if(!st.days.includes(d)){st.days.push(d);save()}}
+const DISCORD='https://discord.com/'; /* ← 自習室Discordの招待リンクに差し替え */
+
+/* ---------- 音声・効果音 ---------- */
+let ac;
+function chime(){try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime;o.type='sine';o.frequency.value=437;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.25,t+.05);g.gain.exponentialRampToValueAtTime(.001,t+1.4);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+1.5)}catch(e){}}
+function say(text){try{if(!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text.replace(/\(Tagalog:[\s\S]*$/,''));u.lang='ja-JP';u.rate=.9;speechSynthesis.speak(u)}catch(e){}}
+
+/* ---------- カリキュラム（curriculum.json から読み込み。正解は常に先頭、表示時にシャッフル） ---------- */
+let CH=[];
+async function loadCurriculum(){
+ let j;
+ try{
+  const r=await fetch('curriculum.json',{cache:'no-cache'});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  j=await r.json();store.set('yvca_cur',j);
+ }catch(e){
+  j=store.get('yvca_cur',null);
+  if(!j)throw e;
+ }
+ if(!j||!Array.isArray(j.chapters)||!j.chapters.length)throw new Error('curriculum.json の形式が正しくありません');
+ CH=j.chapters;
+}
+
+/* ---------- タブ ---------- */
+const TABS=[['lec','📚','講義'],['off','🧑‍🏫','職員室'],['lab','🎤','ラボ'],['lng','☕','自習室']];
+function go(id){TABS.forEach(([i])=>{$('#v-'+i).hidden=i!==id;$('#t-'+i).classList.toggle('on',i===id)});if(id==='lec')renderLec();if(id==='lng')renderLng()}
+
+/* ---------- ① レクチャーホール ---------- */
+function renderLec(){
+ $('#v-lec').replaceChildren(
+  h('div',{class:'card'},h('b',{},`おかえりなさい、${st.name}さん！`),h('br'),`今日は第${Math.min(st.ch,CH.length)}章ですね。`,h('div',{class:'mu'},`学習 ${st.minutes}分 ／ バッジ ${st.badges.length}個`)),
+  CH.map(c=>{const open=c.id<=st.ch,done=st.badges.includes(c.id);
+   return h('button',{class:'card row'+(open?'':' lock'),disabled:!open,onclick:()=>openCh(c.id)},h('span',{},`第${c.id}章　${c.t}`),h('span',{},done?'🏅':open?'▶':'🔒'))}));
+}
+function openCh(id){
+ go('lec');const c=CH[id-1];if(!c||id>st.ch)return;
+ $('#v-lec').replaceChildren(
+  h('button',{class:'link',onclick:renderLec},'← 章一覧'),
+  h('div',{class:'card'},h('h3',{},`第${c.id}章　${c.t}`),h('p',{class:'mu'},'今日のことば'),
+   c.w.map(([j,e])=>h('div',{class:'word'},h('b',{},j),h('span',{class:'mu'},e),h('button',{class:'sm',onclick:()=>say(j)},'🔊'))),
+   h('p',{class:'mu'},'会話スクリプト'),h('p',{class:'script'},c.s),
+   h('button',{class:'sm',onclick:()=>say(c.s)},'🔊 聞く'),h('br'),
+   h('button',{class:'pri',onclick:()=>drill(c)},'章末ドリルへ（3問）')));
+}
+function drill(c){
+ let i=0,ok=0;const v=$('#v-lec');
+ const step=()=>{
+  if(i>=c.q.length)return fin();
+  const q=c.q[i],opts=q.o.map((t,k)=>({t,r:k===0})).sort(()=>Math.random()-.5);
+  v.replaceChildren(h('div',{class:'card'},h('p',{class:'mu'},`第${c.id}章 ドリル ${i+1}/${c.q.length}`),h('p',{},h('b',{},q.q)),
+   opts.map(o=>{const b=h('button',{class:'opt'},o.t);
+    b.onclick=()=>{v.querySelectorAll('.opt').forEach(x=>x.disabled=true);b.classList.add(o.r?'good':'bad');if(o.r){ok++;chime()}setTimeout(()=>{i++;step()},900)};
+    return b})));
+ };
+ const fin=()=>{
+  const pass=ok===c.q.length;
+  log({t:'drill',ch:c.id,s:ok,n:c.q.length,p:pass,m:pass?5:0});
+  if(pass){if(!st.badges.includes(c.id))st.badges.push(c.id);if(st.ch===c.id)st.ch=c.id+1;st.minutes+=5;save();chime()}
+  v.replaceChildren(h('div',{class:'card'},h('h3',{},pass?'合格！🎉':'もう少し！'),
+   h('p',{},`${ok} / ${c.q.length} 問正解。`+(pass?(c.id<CH.length?'次の章が開きました。':'すべての章を修了しました！'):'全問正解で次の章が開きます。')),
+   h('button',{class:'pri',onclick:pass?renderLec:()=>drill(c)},pass?'章一覧へ':'もう一度'),
+   h('button',{class:'sm',onclick:()=>openCh(c.id)},'復習する')));
+ };
+ step();
+}
+
+/* ---------- ② ファシリティオフィス（AIせんせい） ---------- */
+const SYS=`あなたは「Yoshida Virtual Care Academy」の温かく頼れるベテラン介護指導員「AIせんせい」です。
+相手は日本への渡航を控えた、あるいは日本で働くフィリピンの介護人材です。
+【対話ルール】
+1. 日本語レベルはN4〜N3の「やさしい日本語」を基本とし、適宜タガログ語や英語の補足を挟むこと。回答は短く、5文以内。
+2. 介護専門用語（移乗、褥瘡、バイタル等）の質問には、現場での具体的シチュエーションを交えてわかりやすく教える。
+3. ビザ、在留資格、労働契約、重いメンタル不調・健康不安に関する質問があった場合は、断定的な法的判断を避け、「それはとても大切なことですから、校長先生・担当コーディネーターに確認しますね」と優しく伝え、フラグ [EXCEPTION_FLAG] を出力すること。`;
+const EXC=/ビザ|在留|契約|給料|賃金|残業代|死にたい|消えたい|うつ病|眠れない|つらくて|visa|contract|salary|depress/i;
+const ESC='それはとても大切なことですから、校長先生・担当コーディネーターに確認しますね。少し待っていてください。\n(Tagalog: Mahalaga po ito, kaya itatanong ko po sa punong guro / coordinator.)';
+const KB=[
+[/褥瘡|床ずれ|じょくそう/,'褥瘡（じょくそう）は、長い時間おなじ姿勢でいて、皮膚が赤くなったり傷になったりすることです。体位変換（たいいへんかん）をして予防します。赤いところを見つけたら、こすらないで、すぐ先輩に報告しましょう。\n(Tagalog: bedsore — sugat dahil sa matagal na paghiga.)',4],
+[/移乗|車いす|車椅子|端座位/,'移乗（いじょう）は、ベッドから車いすなどへ移ることです。まず「移りますよ。よろしいですか？」と声をかけます。車いすのブレーキも、わすれないでくださいね。\n(Tagalog: paglilipat ng pasyente.)',3],
+[/バイタル|血圧|体温|熱/,'バイタルは、体温・脈・血圧・呼吸など、からだの状態の目安です。いつもと違う数字のときは、すぐ先輩や看護師さんに報告しましょう。\n(English: vital signs — report anything unusual right away.)',2],
+[/声かけ|声掛け|あいさつ|痛い/,'声かけは、介助のいちばん大切な入口です。「痛いところはありませんか？」のように、相手が答えやすい聞き方をしましょう。トレーニングラボで練習できますよ！\n(Tagalog: Ang pagbati ay mahalagang simula ng pag-aalaga.)',1]
+];
+const findCh=t=>{const k=KB.find(x=>x[0].test(t));return k?k[2]:null};
+const mock=t=>{if(EXC.test(t))return ESC;const k=KB.find(x=>x[0].test(t));return k?k[1]:'いい質問ですね！もう少しくわしく教えてください。たとえば「褥瘡」「移乗」「バイタル」「声かけ」のように、ことばを入れて聞いてくださいね。\n(English: Try asking with a keyword, e.g. 褥瘡 or 移乗.)'};
+let hist=[];
+function add(role,text){const b=h('div',{class:'msg '+role},text);$('#chat').append(b);$('#chat').scrollTop=1e9;return b}
+function fill(b,r,ch,flag){
+ b.textContent=r;
+ if(flag)b.append(h('div',{class:'tag'},'⚠ 校長先生に通知しました（試作：この端末に記録）'));
+ if(ch)b.append(h('button',{class:'sm',disabled:ch>st.ch,onclick:()=>openCh(ch)},ch>st.ch?`第${ch}章（未開放）`:`📚 第${ch}章「${CH[ch-1].t}」を見る`));
+ $('#chat').scrollTop=1e9;
+}
+async function gemini(){
+ const c=hist.slice(-12);while(c[0]&&c[0].role!=='user')c.shift();
+ const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':st.key},body:JSON.stringify({systemInstruction:{parts:[{text:SYS}]},contents:c})});
+ const j=await r.json();if(!r.ok)throw new Error((j.error&&j.error.message)||r.status);
+ return((j.candidates&&j.candidates[0]&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('')||'（返答が空でした）';
+}
+async function ask(text){
+ add('me',text);hist.push({role:'user',parts:[{text}]});
+ const b=add('ai','…');let r;
+ if(st.key){try{r=await gemini()}catch(e){r='（Gemini接続エラー: '+e.message+'）\n'+mock(text)}}else r=mock(text);
+ const flag=EXC.test(text)||r.includes('[EXCEPTION_FLAG]');
+ r=r.replace(/\[EXCEPTION_FLAG\]/g,'').trim();
+ if(flag&&!r.includes('校長先生'))r+='\n\n'+ESC;
+ hist.push({role:'model',parts:[{text:r}]});
+ if(flag){st.alerts.unshift({id:'ALT_'+Date.now(),type:'delicate_question',msg:text,resolved:false,at:new Date().toISOString()});save();renderAlerts()}
+ fill(b,r,flag?null:findCh(text),flag);
+ if($('#voice').checked)say(r);
+}
+function renderAlerts(){
+ $('#alerts').replaceChildren(st.alerts.length?st.alerts.slice(0,10).map(a=>h('div',{class:'mu'},`${a.at.slice(0,16).replace('T',' ')}　${a.resolved?'✅':'🔔'}　${a.msg}`)):h('div',{class:'mu'},'例外アラートはありません'));
+}
+function buildOffice(){
+ const inp=h('input',{type:'text',id:'q',placeholder:'せんせいに質問… 例：褥瘡って何ですか？',autocomplete:'off'});
+ const f=h('form',{onsubmit:e=>{e.preventDefault();const t=inp.value.trim();if(t){inp.value='';ask(t)}}},inp,h('button',{class:'pri',type:'submit'},'送信'));
+ const key=h('input',{type:'password',placeholder:'Gemini APIキー（任意）',value:st.key});
+ const nm=h('input',{type:'text',placeholder:'表示名',value:st.name});
+ $('#v-off').replaceChildren(
+  h('div',{class:'card'},h('b',{},'🧑‍🏫 AIせんせい'),h('div',{class:'mu'},st.key?'Gemini 2.5 Flash に接続中':'モック応答モード（キーワード応答）'),
+   h('label',{class:'mu'},h('input',{type:'checkbox',id:'voice'}),' 返答を音声で読み上げる')),
+  h('div',{id:'chat'}),f,
+  h('details',{},h('summary',{},'⚙ 設定 / 校長室プレビュー'),
+   h('div',{class:'card'},h('p',{class:'mu'},'表示名'),nm,h('p',{class:'mu'},'Gemini APIキーを入れると実AIで応答します。キーはこの端末のlocalStorageにのみ保存されます（試作用。本番ではCloud Functions等のサーバー経由にしてください）。'),key,
+    h('button',{class:'pri',onclick:()=>{st.key=key.value.trim();st.name=nm.value.trim()||'Maria';save();buildOffice();add('ai','設定を保存しました。')}},'保存'),
+    h('p',{},h('a',{href:'report.html',target:'_blank'},'📄 月次レポートを開く（印刷 / PDF）')),h('p',{class:'mu'},'校長室：例外アラート（直近10件）'),h('div',{id:'alerts'}))));
+ renderAlerts();
+ add('ai',`こんにちは、${st.name}さん！AIせんせいです。介護のことばや声かけ、なんでも聞いてくださいね。\n(Tagalog: Magtanong lang po kayo ng kahit ano.)`);
+}
+
+/* ---------- ③ トレーニングラボ ---------- */
+const TASKS=[
+{p:'「痛いところはありませんか？」とお年寄りに声かけしてください',ok:['痛いところはありませんか','どこか痛いところはありませんか','痛いところはないですか'],ng:[[/^痛いですか$/,'惜しい！「痛いですか？」より「痛いところはありませんか？」の方が安心しますよ。']],hint:'「いたいところは…」で始めてみましょう'},
+{p:'食事介助のとき、お茶をすすめてください',ok:['お茶をどうぞ','お茶はいかがですか','お茶をどうぞ召し上がってください'],ng:[[/^お茶$/,'惜しい！ことばだけでなく「お茶をどうぞ」とていねいに言いましょう。']],hint:'「お茶を…」'},
+{p:'ベッドから車いすに移る前の声かけをしてください',ok:['ベッドから車いすに移りますよろしいですか','車いすに移りますよろしいですか','ベッドから車いすに移りますね'],ng:[],hint:'「ベッドから車いすに移ります。よろしいですか？」'}
+];
+let ti=0;
+const norm=s=>s.normalize('NFKC').replace(/[\s、。，．,.？?！!「」『』・]/g,'').replace(/[ァ-ヶ]/g,c=>String.fromCharCode(c.charCodeAt(0)-96));
+function lev(a,b){const m=a.length,n=b.length,d=Array.from({length:m+1},(_,i)=>[i]);for(let j=1;j<=n;j++)d[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));return d[m][n]}
+function judge(raw){
+ const t=TASKS[ti],n=norm(raw);
+ for(const[re,m]of t.ng)if(re.test(n))return{lv:'close',m,sc:.7,raw};
+ const sc=Math.max(...t.ok.map(o=>{const a=norm(o);return 1-lev(n,a)/Math.max(n.length,a.length,1)}));
+ if(sc>=.85)return{lv:'pass',m:'合格！とても丁寧で、安心できる声かけです。',sc,raw};
+ if(sc>=.6)return{lv:'close',m:`惜しい！お手本は「${t.ok[0]}」です。もう一度言ってみましょう。`,sc,raw};
+ return{lv:'retry',m:`もう一度！ヒント：${t.hint}`,sc,raw};
+}
+function showResult(list){
+ const r=list.sort((a,b)=>b.sc-a.sc)[0];
+ $('#lab-res').replaceChildren(h('div',{class:'res '+r.lv},h('div',{class:'mu'},`認識結果：「${r.raw||'（聞き取れませんでした）'}」　一致度 ${Math.round(r.sc*100)}%`),h('b',{},r.m)));
+ if(r.lv==='pass'){chime();st.labPass++;log({t:'lab',k:ti,m:1});st.minutes++;save();$('#lab-next').hidden=false}
+}
+function listen(){
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!SR){$('#lab-res').replaceChildren(h('div',{class:'res retry'},'このブラウザは音声認識に未対応です（Chrome / Edge / Safari を推奨）。下の入力欄で試してください。'));return}
+ const r=new SR(),mic=$('#mic');r.lang='ja-JP';r.interimResults=false;r.maxAlternatives=3;
+ let got=false;
+ r.onstart=()=>mic.classList.add('rec');
+ r.onresult=e=>{got=true;showResult([...e.results[0]].map(a=>judge(a.transcript)))};
+ r.onerror=e=>{got=true;const m=e.error==='not-allowed'?'マイクの使用を許可してください。':e.error==='no-speech'?'声が聞こえませんでした。もう一度どうぞ。':'音声認識エラー：'+e.error;$('#lab-res').replaceChildren(h('div',{class:'res retry'},m))};
+ r.onend=()=>{mic.classList.remove('rec');if(!got)$('#lab-res').replaceChildren(h('div',{class:'res retry'},'聞き取れませんでした。もう一度どうぞ。'))};
+ try{r.start()}catch(e){}
+}
+function showTask(){
+ $('#lab-task').textContent=TASKS[ti].p;$('#lab-n').textContent=`課題 ${ti+1}/${TASKS.length}`;
+ $('#lab-res').replaceChildren();$('#lab-next').hidden=true;
+}
+function buildLab(){
+ const inp=h('input',{type:'text',id:'lab-in',placeholder:'（マイクが使えないとき）ここに入力して判定'});
+ $('#v-lab').replaceChildren(
+  h('div',{class:'card'},h('b',{},'🎤 声かけ特訓'),h('div',{class:'mu',id:'lab-n'}),h('p',{id:'lab-task'}),
+   h('button',{class:'sm',onclick:()=>say(TASKS[ti].ok[0])},'🔊 お手本を聞く'),
+   h('button',{class:'mic',id:'mic',onclick:listen,'aria-label':'話す'},'🎙'),h('div',{class:'mu',style:'text-align:center'},'ボタンを押して話してください'),
+   h('form',{onsubmit:e=>{e.preventDefault();if(inp.value.trim()){showResult([judge(inp.value)]);inp.value=''}}},inp,h('button',{class:'pri',type:'submit'},'判定')),
+   h('div',{id:'lab-res'}),
+   h('button',{class:'pri',id:'lab-next',hidden:true,onclick:()=>{ti=(ti+1)%TASKS.length;showTask()}},'次の課題へ ▶')),
+  h('div',{class:'mu'},'※音声認識はブラウザ内で完結します。判定は文字起こしの一致度で行い、声のトーンは判定しません。'));
+ showTask();
+}
+
+/* ---------- ④ スタディラウンジ ---------- */
+let tm=null,tsec=0;
+function fmt(s){return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+function renderLng(){
+ const n=3+(Math.floor(Date.now()/60000)%7)+(tm?1:0);
+ $('#v-lng').replaceChildren(
+  h('div',{class:'card'},h('b',{},'☕ いま勉強している仲間'),h('div',{class:'big'},`${n}名`),h('div',{class:'mu'},'試作では模擬値です。本番ではFirestoreのアクティブ生徒数を表示します。')),
+  h('div',{class:'card'},h('b',{},'もくもく自習室'),h('p',{class:'mu'},'マイクOFFで、みんなと一緒に机に向かいましょう。'),h('a',{class:'dc',href:DISCORD,target:'_blank',rel:'noopener'},'Discordで自習室に入る')),
+  h('div',{class:'card'},h('b',{},'⏱ 自習タイマー'),h('div',{class:'big',id:'tm'},fmt(tsec)),
+   h('button',{class:'pri',id:'tmb',onclick:toggleTimer},tm?'終了して記録':'スタート')));
+}
+function toggleTimer(){
+ if(tm){clearInterval(tm);tm=null;const m=Math.round(tsec/60);st.minutes+=m;if(m>0)log({t:'study',m});save();tsec=0;if(m>0)chime()}
+ else tm=setInterval(()=>{tsec++;const e=$('#tm');if(e)e.textContent=fmt(tsec)},1000);
+ renderLng();
+}
+
+/* ---------- PWA ---------- */
+function setupPWA(){
+ const icon='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#1f6f6b"/><text x="50" y="66" font-size="48" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="700">Y</text></svg>');
+ const mf={name:'Yoshida Virtual Care Academy',short_name:'YVCA',start_url:location.href.split('#')[0],display:'standalone',background_color:'#f4f8f7',theme_color:'#1f6f6b',icons:[{src:icon,sizes:'any',type:'image/svg+xml',purpose:'any'}]};
+ try{$('#mf').href=URL.createObjectURL(new Blob([JSON.stringify(mf)],{type:'application/manifest+json'}))}catch(e){}
+ if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+/* ---------- 起動 ---------- */
+$('#nav').replaceChildren(TABS.map(([i,ic,l])=>h('button',{id:'t-'+i,onclick:()=>go(i)},h('span',{},ic),l)));
+setupPWA();buildLab();
+loadCurriculum().then(()=>{buildOffice();go('lec')}).catch(e=>{
+ buildOffice();go('lec');
+ $('#v-lec').replaceChildren(h('div',{class:'card'},h('b',{},'教材を読み込めませんでした'),h('p',{class:'mu'},'curriculum.json を index.html と同じ場所に置き、http(s) 経由（Vercel等）で開いてください。file:// では読み込めません。'),h('div',{class:'mu'},String(e.message||e))));
+});
+</script>
+</body>
+</html>
