@@ -95,7 +95,7 @@ function go(id){TABS.forEach(([i])=>{$('#v-'+i).hidden=i!==id;$('#t-'+i).classLi
 function renderLec(){
  $('#v-lec').replaceChildren(
   h('div',{class:'card'},h('b',{},`おかえりなさい、${st.name}さん！`),h('br'),`今日は第${Math.min(st.ch,CH.length)}章ですね。`,h('div',{class:'mu'},`学習 ${st.minutes}分 ／ バッジ ${st.badges.length}個`)),
-  CH.map(c=>{const open=c.id<=st.ch,done=st.badges.includes(c.id);
+  ...CH.map(c=>{const open=c.id<=st.ch,done=st.badges.includes(c.id);
    return h('button',{class:'card row'+(open?'':' lock'),disabled:!open,onclick:()=>openCh(c.id)},h('span',{},`第${c.id}章　${c.t}`),h('span',{},done?'🏅':open?'▶':'🔒'))}));
 }
 function openCh(id){
@@ -174,7 +174,7 @@ async function ask(text){
  if($('#voice').checked)say(r);
 }
 function renderAlerts(){
- $('#alerts').replaceChildren(st.alerts.length?st.alerts.slice(0,10).map(a=>h('div',{class:'mu'},`${a.at.slice(0,16).replace('T',' ')}　${a.resolved?'✅':'🔔'}　${a.msg}`)):h('div',{class:'mu'},'例外アラートはありません'));
+ $('#alerts').replaceChildren(...(st.alerts.length?st.alerts.slice(0,10).map(a=>h('div',{class:'mu'},`${a.at.slice(0,16).replace('T',' ')}　${a.resolved?'✅':'🔔'}　${a.msg}`)):[h('div',{class:'mu'},'例外アラートはありません')]));
 }
 function buildOffice(){
  const inp=h('input',{type:'text',id:'q',placeholder:'せんせいに質問… 例：褥瘡って何ですか？',autocomplete:'off'});
@@ -269,7 +269,7 @@ function setupPWA(){
 }
 
 /* ---------- 起動 ---------- */
-$('#nav').replaceChildren(TABS.map(([i,ic,l])=>h('button',{id:'t-'+i,onclick:()=>go(i)},h('span',{},ic),l)));
+$('#nav').replaceChildren(...TABS.map(([i,ic,l])=>h('button',{id:'t-'+i,onclick:()=>go(i)},h('span',{},ic),l)));
 setupPWA();buildLab();
 loadCurriculum().then(()=>{buildOffice();go('lec')}).catch(e=>{
  buildOffice();go('lec');
