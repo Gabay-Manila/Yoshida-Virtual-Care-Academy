@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YVCA 月次学習レポート</title>
+<style>
+body{margin:0;font:15px/1.6 system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;background:#eef3f2;color:#1d2b2a}
+.bar{background:#fff;border-bottom:1px solid #d9e5e3;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.bar label{display:flex;flex-direction:column;font-size:12px;color:#6b7d7b}
+.bar input[type=text],.bar input[type=month]{font:inherit;padding:6px;border:1px solid #d9e5e3;border-radius:8px}
+button{font:inherit;background:#1f6f6b;color:#fff;border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
+button.sub{background:#fff;color:#1f6f6b;border:1px solid #1f6f6b}
+.page{max-width:794px;margin:14px auto;background:#fff;padding:32px 36px;border:1px solid #d9e5e3}
+h1{font-size:20px;margin:0 0 4px;color:#1f6f6b}
+h2{font-size:15px;border-left:4px solid #1f6f6b;padding-left:8px;margin:22px 0 8px}
+table{width:100%;border-collapse:collapse}
+th,td{border:1px solid #cfdcda;padding:6px 8px;text-align:left}
+th{background:#eef6f5;font-weight:600;width:28%}
+table.g th{width:auto}
+.k{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px}
+.k div{border:1px solid #cfdcda;border-radius:8px;padding:8px;text-align:center;font-size:12px;color:#6b7d7b}
+.k b{display:block;font-size:22px;color:#1f6f6b}
+textarea{width:100%;font:inherit;padding:8px;border:1px solid #cfdcda;border-radius:8px;min-height:140px;resize:vertical}
+#cp{display:none;white-space:pre-wrap;border:1px solid #cfdcda;border-radius:8px;padding:8px;min-height:60px}
+.mu{color:#6b7d7b;font-size:12px}
+.warn{color:#b8650b;font-weight:600}
+@media print{body{background:#fff}.bar{display:none}.page{border:0;margin:0;padding:0;max-width:none}textarea{display:none}#cp{display:block}@page{size:A4;margin:16mm}}
+@media(max-width:600px){.page{padding:16px}.k{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="bar">
+ <label>対象月<input type="month" id="m"></label>
+ <label>学習者名<input type="text" id="nm"></label>
+ <label>受入施設 / 送出機関ID<input type="text" id="org" placeholder="例: FACILITY_TOKYO_01"></label>
+ <label>発行者<input type="text" id="iss"></label>
+ <label><span>サンプル表示</span><input type="checkbox" id="demo"></label>
+ <button class="sub" id="regen">コメントを再生成</button>
+ <button id="pr">🖨 印刷 / PDF保存</button>
+</div>
+<div class="page" id="pg"></div>
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+function h(t,a={},...c){const e=document.createElement(t);for(const k in a){const v=a[k];if(v==null||v===false)continue;if(k==='class')e.className=v;else if(k.startsWith('on'))e[k]=v;else e.setAttribute(k,v)}c.flat().forEach(x=>{if(x!=null&&x!==false)e.append(x)});return e}
+const rd=k=>{try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}};
+const st=rd('yvca')||{};
+const rep=Object.assign({nm:'',org:'',iss:'YOSHIDA EdTech Works / Yoshida Virtual Care Academy',cmt:{}},rd('yvca_report')||{});
+const saveRep=()=>{try{localStorage.setItem('yvca_report',JSON.stringify(rep))}catch(e){}};
+const now=new Date(),thisM=now.toLocaleDateString('sv').slice(0,7);
+const ym=d=>new Date(d).toLocaleDateString('sv').slice(0,7);
+let CH=[];
+async function loadCH(){
+ try{const r=await fetch('curriculum.json',{cache:'no-cache'});if(!r.ok)throw 0;CH=(await r.json()).chapters}
+ catch(e){try{CH=rd('yvca_cur').chapters}catch(e2){CH=[]}}
+}
+const ct=id=>CH[id-1]?CH[id-1].t:'';
+
+function sample(){
+ const y=now.getFullYear(),mo=now.getMonth(),at=(d,hr=10)=>new Date(y,mo,d,hr).toISOString();
+ const D=[1,2,3,5,6,8,9,12,13,14].map(d=>new Date(y,mo,d).toLocaleDateString('sv'));
+ const dr=(d,ch,s,p)=>({at:at(d),t:'drill',ch,s,n:3,p,m:p?5:0});
+ const L=[dr(1,1,3,true),dr(3,2,2,false),dr(5,2,1,false),dr(6,2,3,true),dr(9,3,2,false),dr(12,3,3,true),dr(13,4,2,false),
+  ...[2,5,8,9,12,14].map(d=>({at:at(d),t:'lab',k:0,m:1})),...[1,6,13].map(d=>({at:at(d),t:'study',m:25}))];
+ return{logs:L,days:D};
+}
+function calc(src,m){
+ const L=src.logs.filter(l=>ym(l.at)===m),D=[...new Set(src.days.filter(d=>d.slice(0,7)===m))];
+ const dr=L.filter(l=>l.t==='drill'),per={};
+ dr.forEach(l=>{const p=per[l.ch]=per[l.ch]||{tr:0,fail:0,s:0,n:0};p.tr++;if(!l.p)p.fail++;p.s+=l.s;p.n+=l.n});
+ const ok=dr.reduce((a,l)=>a+l.s,0),n=dr.reduce((a,l)=>a+l.n,0);
+ return{mins:L.reduce((a,l)=>a+(l.m||0),0),days:D.length,rate:n?Math.round(ok/n*100):null,per,
+  maxCh:dr.length?Math.max(...dr.map(l=>l.ch)):0,lab:L.filter(l=>l.t==='lab').length};
+}
+const weakList=c=>Object.entries(c.per).filter(([k,p])=>p.fail>0).sort((a,b)=>b[1].fail-a[1].fail||a[1].s/a[1].n-b[1].s/b[1].n);
+function tmpl(c,name,m){
+ const[y,mo]=m.split('-'),w=weakList(c).map(([k])=>`第${k}章「${ct(k)}」`);
+ return`${name}さんは${y}年${+mo}月、${c.days}日ログインし、合計${c.mins}分学習しました。`+
+  (c.maxCh?`第${c.maxCh}章まで進み、章末テストの平均正答率は${c.rate}%でした。`:'この月は章末テストの記録がありません。')+
+  (c.lab?`声かけ特訓は${c.lab}回合格しました。`:'')+
+  (w.length?`\n復習が必要な単元：${w.join('、')}。`:'')+
+  '\n\n【渡航前指導記録】（指導者が記入）：\n';
+}
+function render(){
+ const m=$('#m').value||thisM,demo=$('#demo').checked,name=$('#nm').value.trim()||'（氏名）';
+ const src=demo?sample():{logs:st.logs||[],days:st.days||[]},c=calc(src,m),w=weakList(c),[y,mo]=m.split('-');
+ const saved=!demo&&rep.cmt[m]!=null?rep.cmt[m]:null;
+ const ta=h('textarea',{rows:7});ta.value=saved!=null?saved:tmpl(c,name,m);
+ const cp=h('div',{id:'cp'});
+ const sync=()=>{cp.textContent=ta.value};sync();
+ ta.oninput=()=>{sync();if(!demo){rep.cmt[m]=ta.value;saveRep()}};
+ window.onbeforeprint=sync;
+ const rows=CH.map(ch=>{const p=c.per[ch.id];return p?h('tr',{},h('td',{},`第${ch.id}章 ${ch.t}`),h('td',{},String(p.tr)),h('td',{},String(p.fail)),h('td',{},Math.round(p.s/p.n*100)+'%'),h('td',{class:p.fail?'warn':''},p.fail?'⚠ 要復習':'OK')):null}).filter(Boolean);
+ $('#pg').replaceChildren(
+  h('h1',{},'Yoshida Virtual Care Academy　月次学習レポート'),
+  h('div',{class:'mu'},`対象：${y}年${+mo}月　発行日：${now.toLocaleDateString('ja-JP')}`+(demo?'　【サンプルデータ】':'')),
+  h('table',{style:'margin-top:12px'},
+   h('tr',{},h('th',{},'学習者'),h('td',{},name)),
+   h('tr',{},h('th',{},'受入施設 / 送出機関ID'),h('td',{},$('#org').value.trim()||'—')),
+   h('tr',{},h('th',{},'発行者'),h('td',{},$('#iss').value.trim()||'—'))),
+  h('div',{class:'k'},h('div',{},h('b',{},String(c.mins)),'月間学習時間（分）'),h('div',{},h('b',{},String(c.days)),'ログイン日数'),
+   h('div',{},h('b',{},c.maxCh?`第${c.maxCh}章`:'—'),'到達章'),h('div',{},h('b',{},c.rate==null?'—':c.rate+'%'),'章末テスト平均正答率')),
+  h('h2',{},'1. 章末テストの結果'),
+  rows.length?h('table',{class:'g'},h('tr',{},['章','受験回数','不合格回数','正答率','状況'].map(t=>h('th',{},t))),rows):h('p',{class:'mu'},'この月の章末テスト記録はありません。'),
+  h('h2',{},'2. 弱点傾向（やり直しの多かった単元）'),
+  w.length?h('ol',{},w.map(([k,p])=>h('li',{},`第${k}章「${ct(k)}」— 不合格${p.fail}回 / 受験${p.tr}回`))):h('p',{class:'mu'},'やり直しの多かった単元はありません。'),
+  h('h2',{},'3. 指導コメント / 渡航前指導記録'),ta,cp,
+  h('p',{class:'mu',style:'margin-top:20px'},'※ 修了バッジは本アカデミーのカリキュラム修了の証明であり、国家資格・公的資格ではありません。学習時間・正答率は学習者の端末に記録された内容に基づきます。'));
+}
+(async()=>{
+ await loadCH();
+ $('#m').value=thisM;$('#nm').value=rep.nm||st.name||'';$('#org').value=rep.org;$('#iss').value=rep.iss;
+ ['nm','org','iss'].forEach(k=>$('#'+k).addEventListener('input',()=>{rep[k]=$('#'+k).value;saveRep();render()}));
+ $('#m').onchange=render;$('#demo').onchange=render;
+ $('#regen').onclick=()=>{delete rep.cmt[$('#m').value||thisM];saveRep();render()};
+ $('#pr').onclick=()=>window.print();
+ render();
+})();
+</script>
+</body>
+</html>
